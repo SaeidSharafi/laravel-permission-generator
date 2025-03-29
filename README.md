@@ -2,7 +2,7 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/saeidsharafi/laravel-permission-generator.svg?style=flat-square)](https://packagist.org/packages/saeidsharafi/laravel-permission-generator)
 [![Total Downloads](https://img.shields.io/packagist/dt/saeidsharafi/laravel-permission-generator.svg?style=flat-square)](https://packagist.org/packages/saeidsharafi/laravel-permission-generator)
-[![License](https://img.shields.io/packagist/l/saeidsharafi/laravel-permission-generator.svg?style=flat-square)](LICENSE)
+[![MIT Licensed](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
 Generate a PHP Permission Enum class for your Laravel application based on a configuration file and keep it synchronized with your `spatie/laravel-permission` database tables.
 
@@ -18,6 +18,9 @@ Stop manually defining permission strings everywhere and prevent typos!
 *   Supports custom actions and standalone permissions defined via strings or custom Enums.
 *   Optionally syncs all permissions to a designated "Super Admin" role.
 *   Optionally cleans up stale permissions from the database.
+*   Customizable enum template through published stubs.
+*   Automatically generates the enum file if missing during permissions sync.
+*   Configurable enum class namespace.
 
 ## Requirements
 
@@ -32,19 +35,19 @@ Install the package via Composer:
 ```bash
 composer require saeidsharafi/laravel-permission-generator
 ```
+
 ## Setup
 
 1.  **Publish the configuration file:**
-
     ```bash
     php artisan vendor:publish --provider="SaeidSharafi\LaravelPermissionGenerator\PermissionGeneratorServiceProvider" --tag="permission-generator-config"
     ```
-
     This creates `config/permission-generator.php` in your application.
 
 2.  **Customize the Configuration:**
     Open `config/permission-generator.php` and define:
     *   `output_enum`: The path where your `PermissionEnum.php` file will be created (e.g., `app_path('Enums/PermissionEnum.php')`).
+    *   `enum_class`: The fully qualified class name of your enum (e.g., `App\Enums\PermissionEnum`).
     *   `resources`: List your application resources (e.g., 'user', 'post') and their associated actions. Define actions using:
         *   **Strings (Recommended):** Use simple strings like `'view_scoped'`, `'create'`, `'update_scoped'`, or custom action names like `'publish'`, `'manage_roles'`. The generator recognizes specific string values like `'view_scoped'` to automatically create `_any` and simple/`_own` versions. Other strings generate literal `resource.action` permissions.
         *   **`PermissionAction` Enum (Optional):** For standard patterns recognized by the generator, you can optionally `use SaeidSharafi\LaravelPermissionGenerator\Enums\PermissionAction;` and use constants like `PermissionAction::VIEW_SCOPED` for clarity.
@@ -53,19 +56,23 @@ composer require saeidsharafi/laravel-permission-generator
     *   `super_admin_role`: (Optional) Name of the role to grant all permissions.
     *   `remove_stale_permissions`: (Optional) Set to `true` to enable cleanup of old permissions during sync (use with caution).
 
+3.  **Customize Enum Templates (Optional):**
+    ```bash
+    php artisan vendor:publish --provider="SaeidSharafi\LaravelPermissionGenerator\PermissionGeneratorServiceProvider" --tag="permission-generator-stubs"
+    ```
+    This publishes the enum template to `stubs/vendor/permission-generator/enum.stub` where you can customize it.
+
 ## Usage Workflow
 
 1.  **Configure:** Define your desired permission structure in `config/permission-generator.php`.
 
 2.  **Generate Enum:** Create or update your `PermissionEnum.php` file:
-
     ```bash
     php artisan permissions:generate-enum
     ```
     *   Use `--force` to overwrite without confirmation.
 
 3.  **Sync Database:** Ensure the permissions defined in your Enum exist in the database for `spatie/laravel-permission`:
-
     ```bash
     php artisan permissions:sync
     ```
@@ -73,21 +80,27 @@ composer require saeidsharafi/laravel-permission-generator
     *   Use `--yes` or `-Y` to skip confirmation prompts.
 
 4.  **Use the Enum:** Import and use your generated Enum (e.g., `App\Enums\PermissionEnum`) in your code (Policies, Middleware, Controllers, Filament, etc.) for type safety and auto-completion.
-
     ```php
     use App\Enums\PermissionEnum; // Adjust namespace if you changed the output path
-
+    
     // Example Policy
     public function updateAny(User $user): bool
     {
         return $user->hasPermissionTo(PermissionEnum::POST_UPDATE_ANY->value);
     }
-
+    
     // Example Middleware or Controller Check
     if (! Auth::user()?->can(PermissionEnum::ACCESS_ADMIN_DASHBOARD->value)) {
         abort(403);
     }
     ```
+
+## Streamlined Workflow
+
+The package now supports a more streamlined workflow:
+
+1. If you run `permissions:sync` without first generating the enum file, it will automatically run `permissions:generate-enum` for you.
+2. This makes it easier to get started with minimal setup - just configure your permissions and run `php artisan permissions:sync`.
 
 ## Configuration Details
 
