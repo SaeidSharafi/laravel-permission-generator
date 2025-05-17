@@ -13,7 +13,7 @@ use function Laravel\Prompts\select;
 
 class PermissionsSync extends Command
 {
-    protected $signature = 'permissions:sync {--fresh : Delete existing permissions before syncing} {--Y|yes : Skip confirmation prompts}';
+    protected $signature = 'permissions:sync {--guard= : authentication guard} {--fresh : Delete existing permissions before syncing} {--Y|yes : Skip confirmation prompts}';
     protected $description = 'Sync permissions from the generated Enum to the database.';
 
     protected Filesystem $files;
@@ -84,14 +84,17 @@ class PermissionsSync extends Command
                 return Command::FAILURE;
             }
         }
-        $guards = array_keys(config('auth.guards', ['web']));
-        $guard = select('Select guard for permissions', $guards, 0);
-        
-        if (!in_array($guard, $guards)) {
-            $this->error("Guard '{$guard}' not found in the configuration.");
-            return Command::FAILURE;
+
+        if (!($guard = $this->option('guard'))) {
+            $guards = array_keys(config('auth.guards', ['web']));
+            $guard = select('Select guard for permissions', $guards, 0);
+
+            if (!in_array($guard, $guards)) {
+                $this->error("Guard '{$guard}' not found in the configuration.");
+                return Command::FAILURE;
+            }
         }
-        
+
         [$createdCount, $existingCount] = $this->syncPermissions($definedPermissions, $guard);
         $this->info("Sync complete. Found {$existingCount} existing permissions. Created {$createdCount} new permissions.");
 
