@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
+use function Laravel\Prompts\select;
 
 class PermissionsSync extends Command
 {
@@ -83,8 +84,15 @@ class PermissionsSync extends Command
                 return Command::FAILURE;
             }
         }
-
-        [$createdCount, $existingCount] = $this->syncPermissions($definedPermissions);
+        $guards = array_keys(config('auth.guards', ['web']));
+        $guard = select('Select guard for permissions', $guards, 0);
+        
+        if (!in_array($guard, $guards)) {
+            $this->error("Guard '{$guard}' not found in the configuration.");
+            return Command::FAILURE;
+        }
+        
+        [$createdCount, $existingCount] = $this->syncPermissions($definedPermissions, $guard);
         $this->info("Sync complete. Found {$existingCount} existing permissions. Created {$createdCount} new permissions.");
 
         if ($createdCount > 0) {
@@ -93,11 +101,11 @@ class PermissionsSync extends Command
 
         $superAdminRoleName = config('permission-generator.super_admin_role');
         if ($superAdminRoleName && $createdCount > 0) {
-            $this->syncSuperAdminRole($superAdminRoleName, config('auth.defaults.guard', 'web'));
+            $this->syncSuperAdminRole($superAdminRoleName, $guard);
         }
 
         if (config('permission-generator.remove_stale_permissions', false)) {
-            $this->removeStalePermissions($definedPermissions, config('auth.defaults.guard', 'web'));
+            $this->removeStalePermissions($definedPermissions, $guard);
         }
 
         return Command::SUCCESS;
@@ -158,9 +166,9 @@ class PermissionsSync extends Command
         }
     }
 
-    private function syncPermissions(array $definedPermissions): array
+    private function syncPermissions(array $definedPermissions , string $guard): array
     {
-        $guardName = config('auth.defaults.guard', 'web');
+        $guardName = $guard ?: config('auth.defaults.guard', 'web');
         $createdCount = 0;
         $existingCount = 0;
 
